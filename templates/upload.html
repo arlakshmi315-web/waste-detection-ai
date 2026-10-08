@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ico %}
+{% block title %}Upload Image{% endblock %}
+{% block heading %}Upload Image{% endblock %}
+{% block content %}
+<div class="banner hidden" id="modelBanner">{{ ico('alert') }}<div><b>Trained model not found.</b> Train the model with <code>python train_model.py</code> and restart the app.</div></div>
+<section class="grid-2b upload-grid">
+  <div class="card">
+    <div class="card-head"><h2>Upload waste image</h2></div>
+
+    <div style="display:flex;gap:8px;margin-bottom:6px">
+      <button class="btn btn-primary mode-btn" type="button" data-mode="single">Single item</button>
+      <button class="btn btn-outline mode-btn" type="button" data-mode="mixed">Mixed waste</button>
+    </div>
+    <p class="muted small" id="modeHint" style="margin:0 0 14px">Use a photo of one waste item. The result is one waste type.</p>
+
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose an image">
+      <div class="drop-ico">{{ ico('upload') }}</div>
+      <p class="drop-title">Drag &amp; drop image here</p>
+      <p class="muted">or</p>
+      <button class="btn btn-outline" id="chooseBtn" type="button">Choose image</button>
+      <p class="muted small">JPG, JPEG or PNG · up to {{ 10 }} MB</p>
+      <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden>
+    </div>
+    <div class="preview hidden" id="preview">
+      <div class="preview-img"><img id="previewImg" alt="Selected image preview"></div>
+      <div class="preview-meta">
+        <div><b id="fileName">–</b><span class="muted small" id="fileSize"></span></div>
+        <button class="btn btn-ghost" id="removeBtn" type="button">{{ ico('x') }} Remove</button>
+      </div>
+    </div>
+    <div class="form-error hidden" id="formError"></div>
+    <button class="btn btn-primary btn-block" id="detectBtn" type="button" disabled><span class="spinner hidden"></span><span class="btn-label">Detect waste</span></button>
+  </div>
+
+  <div class="card" id="resultCard">
+    <div class="card-head"><h2>Result</h2></div>
+    <div id="resultBody"><div class="empty">{{ ico('image', 'big') }}<p>Select an image and click <b>Detect waste</b> to see the prediction.</p></div></div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/upload.js') }}"></script>{% endblock %}

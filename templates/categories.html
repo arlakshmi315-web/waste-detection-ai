@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ico %}
+{% block title %}Waste Categories{% endblock %}
+{% block heading %}Waste Categories{% endblock %}
+{% block content %}
+<p class="lead">The model is trained to recognise <b>{{ categories|length }}</b> waste categories.</p>
+<section class="cat-grid">
+{% for c in categories %}
+  <article class="card cat-card">
+    <div class="cat-head">
+      <span class="cat-ico" style="--c: {{ c.color }}">{{ ico(c.icon) }}</span>
+      <div><h2>{{ c.name }}</h2><span class="tag" style="--c: {{ c.color }}">{{ c.group }}</span></div>
+    </div>
+    <p>{{ c.description }}</p>
+    <h3>Examples</h3>
+    <div class="tags">{% for e in c.examples %}<span class="tag neutral">{{ e }}</span>{% endfor %}</div>
+    <h3>Disposal recommendation</h3>
+    <p class="muted">{{ c.disposal }}</p>
+    <a class="link" href="{{ url_for('history_page') }}?type={{ c.name }}">View {{ c.name|lower }} detections</a>
+  </article>
+{% endfor %}
+</section>
+{% endblock %}

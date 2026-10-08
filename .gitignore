@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+uploads/
+database/
+dataset/
+raw_images/
+model/*.keras
+model/_saved_model_tmp/
+.env

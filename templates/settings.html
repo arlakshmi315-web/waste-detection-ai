@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ico %}
+{% block title %}Settings{% endblock %}
+{% block heading %}Settings{% endblock %}
+{% block content %}
+<section class="settings">
+  <div class="card">
+    <div class="card-head"><h2>Detection</h2></div>
+    <div class="setting"><div><b>Use my location</b><p class="muted small">Attach your browser location to every detection. Your browser will ask for permission.</p></div>
+      <label class="switch"><input type="checkbox" id="setLocation"><span></span></label></div>
+    <div class="setting"><div><b>Live detection interval</b><p class="muted small">How often a frame is analysed while live detection is running.</p></div>
+      <select id="setInterval" class="select"><option value="1500">1.5 s</option><option value="2000">2 s</option><option value="3000">3 s</option><option value="5000">5 s</option></select></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Model</h2></div>
+    <div class="setting"><div><b>Status</b></div><span class="pill" id="setModel"><span class="dot"></span><span>Checking…</span></span></div>
+    <div class="setting"><div><b>Model file</b></div><code>model/{{ model_file }}</code></div>
+    <div class="setting col"><div><b>Trained classes</b></div><div class="tags">{% for c in classes %}<span class="tag neutral">{{ c }}</span>{% endfor %}</div></div>
+    <div class="setting"><div><b>Accepted images</b></div><span class="muted">JPG, JPEG, PNG · max {{ max_mb }} MB</span></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Data</h2></div>
+    <div class="setting"><div><b>Clear detection history</b><p class="muted small">Deletes all records and saved images.</p></div>
+      <button class="btn btn-danger-outline" id="clearBtn">Clear history</button></div>
+  </div>
+</section>
+<dialog id="clearDialog" class="dialog small-dialog">
+  <h2>Clear all history?</h2><p class="muted">All detections and saved images will be permanently deleted.</p>
+  <div class="btn-row end"><button class="btn btn-outline" id="cancelClear">Cancel</button><button class="btn btn-danger" id="confirmClear">Clear all</button></div>
+</dialog>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/settings.js') }}"></script>{% endblock %}

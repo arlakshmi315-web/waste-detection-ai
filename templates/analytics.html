@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ico %}
+{% block title %}Analytics{% endblock %}
+{% block heading %}Analytics{% endblock %}
+{% block content %}
+<section class="stats">
+  <div class="card stat"><span class="stat-label">Total detections</span><span class="stat-value" id="sTotal">–</span></div>
+  <div class="card stat"><span class="stat-label">Most common waste</span><span class="stat-value" id="sTop">–</span></div>
+  <div class="card stat"><span class="stat-label">Today</span><span class="stat-value" id="sToday">–</span></div>
+  <div class="card stat"><span class="stat-label">Avg. confidence</span><span class="stat-value" id="sAvg">–</span></div>
+</section>
+<div class="card empty hidden" id="noData"><p>No detection data available yet.</p><a class="btn btn-primary" href="{{ url_for('upload_page') }}">Detect your first image</a></div>
+<div id="charts">
+<section class="grid-2">
+  <div class="card"><div class="card-head"><h2>Category distribution</h2></div><div class="chart-box"><canvas id="distChart"></canvas></div></div>
+  <div class="card"><div class="card-head"><h2>Average confidence by category</h2></div><div class="chart-box"><canvas id="confChart"></canvas></div></div>
+</section>
+<section class="grid-3">
+  <div class="card"><div class="card-head"><h2>Daily · last 14 days</h2></div><div class="chart-box sm"><canvas id="dayChart"></canvas></div></div>
+  <div class="card"><div class="card-head"><h2>Weekly · last 8 weeks</h2></div><div class="chart-box sm"><canvas id="weekChart"></canvas></div></div>
+  <div class="card"><div class="card-head"><h2>Monthly · last 6 months</h2></div><div class="chart-box sm"><canvas id="monthChart"></canvas></div></div>
+</section>
+<section class="grid-2">
+  <div class="card"><div class="card-head"><h2>Confidence spread</h2></div><div class="chart-box sm"><canvas id="bucketChart"></canvas></div></div>
+</section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}

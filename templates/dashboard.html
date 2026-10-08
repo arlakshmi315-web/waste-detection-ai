@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ico %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block content %}
+<div class="banner hidden" id="modelBanner">
+  {{ ico('alert') }}
+  <div><b>Trained model not found.</b> Train the model with <code>python train_model.py</code> and restart the app to enable detection.</div>
+</div>
+
+<section class="stats">
+  <div class="card stat"><span class="stat-label">Total detections</span><span class="stat-value" id="sTotal">–</span></div>
+  <div class="card stat"><span class="stat-label">Today</span><span class="stat-value" id="sToday">–</span></div>
+  <div class="card stat"><span class="stat-label">Top category</span><span class="stat-value" id="sTop">–</span></div>
+  <div class="card stat"><span class="stat-label">Avg. confidence</span><span class="stat-value" id="sAvg">–</span></div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Waste distribution</h2></div>
+    <div id="distWrap" class="chart-box"><canvas id="distChart"></canvas></div>
+    <div id="distEmpty" class="empty hidden">No detection data available yet.</div>
+    <ul class="legend" id="distLegend"></ul>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <h2>Detection activity</h2>
+      <div class="segmented" id="rangeSwitch">
+        <button data-r="today">Today</button><button data-r="week" class="on">Week</button><button data-r="month">Month</button>
+      </div>
+    </div>
+    <div id="actWrap" class="chart-box"><canvas id="actChart"></canvas></div>
+    <div id="actEmpty" class="empty hidden">No detection data available yet.</div>
+  </div>
+</section>
+
+<section class="grid-2b">
+  <div class="card">
+    <div class="card-head"><h2>Recent detections</h2><a class="link" href="{{ url_for('history_page') }}">View all</a></div>
+    <div id="recent"></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Quick start</h2></div>
+    <div class="quick">
+      <a href="{{ url_for('upload_page') }}" class="quick-item">{{ ico('upload') }}<div><b>Upload image</b><small>Detect waste from a photo</small></div></a>
+      <a href="{{ url_for('live_page') }}" class="quick-item">{{ ico('camera') }}<div><b>Live detection</b><small>Use your webcam</small></div></a>
+      <a href="{{ url_for('analytics_page') }}" class="quick-item">{{ ico('chart') }}<div><b>Analytics</b><small>Explore detection trends</small></div></a>
+      <a href="{{ url_for('categories_page') }}" class="quick-item">{{ ico('layers') }}<div><b>Waste categories</b><small>What the model recognises</small></div></a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

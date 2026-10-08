@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if mode == 'login' %}Sign in{% else %}Create account{% endif %} · Waste Detection AI</title>
+  <style>
+    :root{--bg:#f4f7f6;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0;--brand:#059669;--brand-d:#047857;--err:#b91c1c;--errbg:#fef2f2}
+    @media (prefers-color-scheme:dark){:root{--bg:#0b1220;--card:#111a2c;--text:#e5edf7;--muted:#94a3b8;--line:#243049;--brand:#10b981;--brand-d:#059669;--err:#fca5a5;--errbg:#3b1219}}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px 24px;box-shadow:0 8px 30px rgba(15,23,42,.06)}
+    .logo{width:44px;height:44px;border-radius:12px;background:var(--brand);display:grid;place-items:center;margin-bottom:14px}
+    .logo svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    h1{font-size:22px;margin:0 0 4px}
+    .sub{color:var(--muted);font-size:14px;margin:0 0 20px}
+    label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+    input{width:100%;height:44px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--text);font-size:15px}
+    input:focus{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+    .pw{position:relative}
+    .pw button{position:absolute;right:6px;top:6px;height:32px;padding:0 10px;border:0;background:transparent;color:var(--muted);font-size:13px;cursor:pointer;border-radius:8px}
+    .err{display:none;margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--errbg);color:var(--err);font-size:14px}
+    .err.show{display:block}
+    .submit{width:100%;height:46px;margin-top:20px;border:0;border-radius:10px;background:var(--brand);color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+    .submit:hover{background:var(--brand-d)}
+    .submit:disabled{opacity:.6;cursor:wait}
+    .alt{margin:18px 0 0;text-align:center;font-size:14px;color:var(--muted)}
+    .alt a{color:var(--brand);font-weight:600;text-decoration:none}
+    .alt a:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12A9 9 0 0 1 18.5 5.8"/><path d="M18.5 2v4h-4M5.5 22v-4h4"/></svg></div>
+    <h1>{% if mode == 'login' %}Welcome back{% else %}Create your account{% endif %}</h1>
+    <p class="sub">{% if mode == 'login' %}Sign in to Waste Detection AI.{% else %}Sign up to start detecting and tracking waste.{% endif %}</p>
+
+    <form id="form" novalidate>
+      {% if mode == 'register' %}
+      <label for="name">Full name</label>
+      <input id="name" name="name" type="text" autocomplete="name" required maxlength="80">
+      {% endif %}
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required>
+      <label for="password">Password</label>
+      <div class="pw">
+        <input id="password" name="password" type="password" autocomplete="{% if mode == 'login' %}current-password{% else %}new-password{% endif %}" required minlength="6">
+        <button type="button" id="toggle" aria-label="Show password">Show</button>
+      </div>
+      {% if mode == 'register' %}
+      <label for="confirm">Confirm password</label>
+      <input id="confirm" name="confirm" type="password" autocomplete="new-password" required minlength="6">
+      {% endif %}
+      <div id="err" class="err" role="alert"></div>
+      <button class="submit" id="submit" type="submit">{% if mode == 'login' %}Sign in{% else %}Create account{% endif %}</button>
+    </form>
+
+    <p class="alt">
+      {% if mode == 'login' %}New here? <a id="alt" href="/register">Create an account</a>
+      {% else %}Already have an account? <a id="alt" href="/login">Sign in</a>{% endif %}
+    </p>
+  </main>
+
+  <script>
+  (function () {
+    var MODE = "{{ mode }}";
+    var qs = new URLSearchParams(location.search);
+    var next = qs.get("next") || "/";
+    if (next.charAt(0) !== "/" || next.charAt(1) === "/") next = "/";   // same-site paths only
+    var alt = document.getElementById("alt");
+    if (next !== "/") alt.href += "?next=" + encodeURIComponent(next);
+
+    var form = document.getElementById("form"), err = document.getElementById("err"),
+        btn = document.getElementById("submit"), pw = document.getElementById("password");
+    document.getElementById("toggle").addEventListener("click", function () {
+      var show = pw.type === "password";
+      pw.type = show ? "text" : "password";
+      this.textContent = show ? "Hide" : "Show";
+    });
+    function showError(m) { err.textContent = m; err.classList.add("show"); }
+
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      err.classList.remove("show");
+      var body = {
+        email: form.email.value.trim(),
+        password: pw.value
+      };
+      if (MODE === "register") {
+        body.name = form.name.value.trim();
+        if (body.name.length < 2) return showError("Please enter your name.");
+        if (pw.value.length < 6) return showError("Password must be at least 6 characters.");
+        if (pw.value !== form.confirm.value) return showError("The two passwords do not match.");
+      }
+      if (!body.email || !pw.value) return showError("Please enter your email and password.");
+
+      btn.disabled = true;
+      var label = btn.textContent;
+      btn.textContent = MODE === "login" ? "Signing in…" : "Creating account…";
+      fetch("/api/auth/" + MODE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; });
+      }).then(function (res) {
+        if (res.ok) { location.href = next; return; }
+        showError(res.d.error || "Something went wrong. Please try again.");
+      }).catch(function () {
+        showError("Cannot reach the server. Make sure the app is running.");
+      }).then(function () { btn.disabled = false; btn.textContent = label; });
+    });
+  })();
+  </script>
+</body>
+</html>

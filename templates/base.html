@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Dashboard{% endblock %} · Waste Detection AI</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23059669'/%3E%3Cpath d='M16 8c-4 2-6 5-6 8a6 6 0 0 0 12 0c0-3-2-6-6-8z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+{% include "_icons.html" %}
+{% from "_macros.html" import ico %}
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{{ url_for('dashboard') }}">
+      <span class="brand-mark">{{ ico('recycle') }}</span>
+      <span class="brand-text"><b>Waste Detection</b><small>AI Dashboard</small></span>
+    </a>
+    <nav class="nav">
+      {% set items = [
+        ('dashboard','Dashboard','dashboard','dashboard'),
+        ('upload','Upload Image','upload','upload_page'),
+        ('live','Live Detection','camera','live_page'),
+        ('history','Detection History','history','history_page'),
+        ('categories','Waste Categories','layers','categories_page'),
+        ('analytics','Analytics','chart','analytics_page'),
+        ('settings','Settings','settings','settings_page')] %}
+      {% for key, label, icon, endpoint in items %}
+      <a href="{{ url_for(endpoint) }}" class="nav-item {{ 'active' if active == key }}">{{ ico(icon) }}<span>{{ label }}</span></a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">
+      <div class="model-state" id="modelState"><span class="dot"></span><span id="modelStateText">Checking model…</span></div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">{{ ico('menu') }}</button>
+      <h1 class="page-title">{% block heading %}{% endblock %}</h1>
+      <button class="chip" id="locChip" title="Detection location">{{ ico('pin') }}<span id="locChipText">Enable location</span></button>
+    </header>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="{{ url_for('static', filename='js/common.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

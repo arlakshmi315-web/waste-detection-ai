@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ico %}
+{% block title %}Live Detection{% endblock %}
+{% block heading %}Live Detection{% endblock %}
+{% block content %}
+<div class="banner hidden" id="modelBanner">{{ ico('alert') }}<div><b>Trained model not found.</b> Train the model with <code>python train_model.py</code> and restart the app.</div></div>
+<section class="grid-2b upload-grid">
+  <div class="card">
+    <div class="card-head"><h2>Camera</h2><span class="pill" id="camStatus"><span class="dot"></span><span id="camStatusText">Camera off</span></span></div>
+    <div class="video-box" id="videoBox">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="video-placeholder" id="videoPlaceholder">{{ ico('camera', 'big') }}<p>Camera is off</p></div>
+      <div class="live-tag hidden" id="liveTag"><span class="dot"></span>Detecting</div>
+      <div class="video-overlay hidden" id="videoOverlay"></div>
+    </div>
+    <div class="form-error hidden" id="camError"></div>
+    <div class="btn-row">
+      <button class="btn btn-outline" id="startCamBtn" type="button">{{ ico('camera') }} Start camera</button>
+      <button class="btn btn-primary" id="detectToggle" type="button" disabled>{{ ico('play') }} <span>Start detection</span></button>
+      <button class="btn btn-outline" id="captureBtn" type="button" disabled>{{ ico('target') }} Capture &amp; predict</button>
+      <button class="btn btn-ghost" id="stopCamBtn" type="button" disabled>{{ ico('stop') }} Stop camera</button>
+    </div>
+    <p class="muted small hint">Start detection analyses a frame every few seconds without saving. Capture &amp; predict saves the frame, location and time to your history.</p>
+    <canvas id="canvas" hidden></canvas>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Prediction</h2></div>
+    <div id="liveResult"><div class="empty">{{ ico('target', 'big') }}<p>Start the camera to see predictions here.</p></div></div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/camera.js') }}"></script>{% endblock %}

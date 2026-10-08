@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ico %}
+{% block title %}Detection History{% endblock %}
+{% block heading %}Detection History{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="toolbar">
+    <div class="search">{{ ico('search') }}<input type="search" id="search" placeholder="Search by file, waste type, location or date" aria-label="Search detections"></div>
+    <div class="filters" id="filters"></div>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Image</th><th>Waste type</th><th>Confidence</th><th>Location</th><th>Date</th><th>Time</th><th class="right">Action</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div id="empty" class="empty hidden"></div>
+</div>
+
+<dialog id="viewDialog" class="dialog">
+  <div class="dialog-head"><h2>Detection details</h2><button class="icon-btn" id="closeView" aria-label="Close">{{ ico('x') }}</button></div>
+  <div id="viewBody"></div>
+</dialog>
+<dialog id="confirmDialog" class="dialog small-dialog">
+  <h2>Delete detection?</h2>
+  <p class="muted">This removes the record and its saved image. This cannot be undone.</p>
+  <div class="btn-row end"><button class="btn btn-outline" id="cancelDel">Cancel</button><button class="btn btn-danger" id="confirmDel">Delete</button></div>
+</dialog>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/history.js') }}"></script>{% endblock %}
