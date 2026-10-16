@@ -3,7 +3,10 @@
 {% block title %}Waste Categories{% endblock %}
 {% block heading %}Waste Categories{% endblock %}
 {% block content %}
-<p class="lead">The model is trained to recognise <b>{{ categories|length }}</b> waste categories.</p>
+<div class="page-intro">
+  <span class="eyebrow">Waste recognition library</span>
+  <p>The model is trained to recognise <b>{{ categories|length }}</b> waste categories with tailored disposal guidance for each stream.</p>
+</div>
 <section class="cat-grid">
 {% for c in categories %}
   <article class="card cat-card">

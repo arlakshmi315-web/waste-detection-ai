@@ -8,6 +8,23 @@
   <div><b>Trained model not found.</b> Train the model with <code>python train_model.py</code> and restart the app to enable detection.</div>
 </div>
 
+<section class="hero-panel card">
+  <div class="hero-copy">
+    <span class="surface-badge">AI waste intelligence</span>
+    <h2>Welcome back to your waste operations dashboard.</h2>
+    <p>Track disposal patterns, review recent detections, and keep your recycling workflow moving with live AI insights.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="{{ url_for('upload_page') }}">Upload image</a>
+      <a class="btn btn-outline" href="{{ url_for('analytics_page') }}">View analytics</a>
+    </div>
+  </div>
+  <div class="hero-metrics">
+    <div class="mini-stat"><span>Smart detections</span><strong>Live</strong></div>
+    <div class="mini-stat"><span>Today</span><strong>Updated</strong></div>
+    <div class="mini-stat"><span>Top category</span><strong>AI-led</strong></div>
+  </div>
+</section>
+
 <section class="stats">
   <div class="card stat"><span class="stat-label">Total detections</span><span class="stat-value" id="sTotal">–</span></div>
   <div class="card stat"><span class="stat-label">Today</span><span class="stat-value" id="sToday">–</span></div>

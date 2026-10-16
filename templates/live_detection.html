@@ -4,6 +4,10 @@
 {% block heading %}Live Detection{% endblock %}
 {% block content %}
 <div class="banner hidden" id="modelBanner">{{ ico('alert') }}<div><b>Trained model not found.</b> Train the model with <code>python train_model.py</code> and restart the app.</div></div>
+<div class="page-intro">
+  <span class="eyebrow">Live waste monitoring</span>
+  <p>Review live camera frames, track the current prediction, and save a specific capture to your history whenever it matters.</p>
+</div>
 <section class="grid-2b upload-grid">
   <div class="card">
     <div class="card-head"><h2>Camera</h2><span class="pill" id="camStatus"><span class="dot"></span><span id="camStatusText">Camera off</span></span></div>

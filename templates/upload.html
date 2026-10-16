@@ -4,6 +4,10 @@
 {% block heading %}Upload Image{% endblock %}
 {% block content %}
 <div class="banner hidden" id="modelBanner">{{ ico('alert') }}<div><b>Trained model not found.</b> Train the model with <code>python train_model.py</code> and restart the app.</div></div>
+<div class="page-intro">
+  <span class="eyebrow">Smart upload flow</span>
+  <p>Choose a clear waste image, pick a single-item or mixed-waste mode, and let the AI classify the item with the same detection pipeline used across the app.</p>
+</div>
 <section class="grid-2b upload-grid">
   <div class="card">
     <div class="card-head"><h2>Upload waste image</h2></div>
