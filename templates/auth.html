@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% if mode == 'login' %}Sign in{% else %}Create account{% endif %} · Waste Detection AI</title>
+  <title>{% if mode == 'login' %}Sign in{% elif mode == 'register' %}Create account{% else %}Reset password{% endif %} · Waste Detection AI</title>
   <style>
     :root {
       --bg: #f4f8f6;
@@ -17,9 +17,12 @@
       --brand-soft: rgba(15,155,113,0.08);
       --err: #b91c1c;
       --errbg: #fef2f2;
+      --okc: #166534;
+      --okbg: #f0fdf4;
       --shadow: 0 28px 52px rgba(15,33,27,0.12), 0 8px 20px rgba(15,33,27,0.06);
     }
     *{box-sizing:border-box}
+    [hidden]{display:none!important}
     body{
       margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
       background:
@@ -42,18 +45,26 @@
     }
     input:focus{outline:none;border-color:rgba(15,155,113,0.5);box-shadow:0 0 0 4px rgba(15,155,113,0.09)}
     .pw{position:relative}
+    .pw input{padding-right:70px}
     .pw button{
       position:absolute; right:8px; top:8px; height:30px; padding:0 10px; border:0; background:var(--brand-soft); color:var(--muted);
       font-size:12px; font-weight:700; cursor:pointer; border-radius:8px;
     }
+    .hint{font-size:12px;color:var(--muted);margin:6px 0 0;line-height:1.45}
+    .qbox{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--brand-soft);font-size:15px;font-weight:600;line-height:1.4}
     .err{display:none;margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--errbg);color:var(--err);font-size:14px}
     .err.show{display:block}
+    .ok{display:none;margin-bottom:14px;padding:10px 12px;border-radius:10px;background:var(--okbg);color:var(--okc);font-size:14px}
+    .ok.show{display:block}
     .submit{
       width:100%; height:48px; margin-top:20px; border:0; border-radius:12px; background:linear-gradient(135deg,var(--brand),var(--brand-d));
       color:#fff; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 12px 24px rgba(15,155,113,0.18);
     }
     .submit:hover{filter:brightness(1.02)}
     .submit:disabled{opacity:.6;cursor:wait}
+    .forgot{text-align:right;margin:8px 0 0;font-size:13px}
+    .forgot a{color:var(--brand);font-weight:700;text-decoration:none}
+    .forgot a:hover{text-decoration:underline}
     .alt{margin:18px 0 0;text-align:center;font-size:14px;color:var(--muted)}
     .alt a{color:var(--brand);font-weight:700;text-decoration:none}
     .alt a:hover{text-decoration:underline}
@@ -70,9 +81,39 @@
 <body>
   <main class="card">
     <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12A9 9 0 0 1 18.5 5.8"/><path d="M18.5 2v4h-4M5.5 22v-4h4"/></svg></div>
-    <h1>{% if mode == 'login' %}Welcome back{% else %}Create your account{% endif %}</h1>
-    <p class="sub">{% if mode == 'login' %}Sign in to Waste Detection AI.{% else %}Sign up to start detecting and tracking waste.{% endif %}</p>
+    <h1>{% if mode == 'login' %}Welcome back{% elif mode == 'register' %}Create your account{% else %}Reset your password{% endif %}</h1>
+    <p class="sub">{% if mode == 'login' %}Sign in to Waste Detection AI.{% elif mode == 'register' %}Sign up to start detecting and tracking waste.{% else %}Enter your email, answer your security question, and choose a new password.{% endif %}</p>
 
+    <div id="ok" class="ok" role="status"></div>
+
+    {% if mode == 'forgot' %}
+    <form id="form" novalidate>
+      <div id="step1">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required>
+        <div id="err1" class="err" role="alert"></div>
+        <button class="submit" id="next" type="submit">Continue</button>
+      </div>
+      <div id="step2" hidden>
+        <label>Your security question</label>
+        <div class="qbox" id="question"></div>
+        <label for="answer">Your answer</label>
+        <input id="answer" name="answer" type="text" autocomplete="off" required>
+        <p class="hint">Capital letters and extra spaces do not matter.</p>
+        <label for="newpw">New password</label>
+        <div class="pw">
+          <input id="newpw" name="newpw" type="password" autocomplete="new-password" required minlength="6">
+          <button type="button" id="toggle" aria-label="Show password">Show</button>
+        </div>
+        <label for="newpw2">Confirm new password</label>
+        <input id="newpw2" name="newpw2" type="password" autocomplete="new-password" required minlength="6">
+        <div id="err2" class="err" role="alert"></div>
+        <button class="submit" id="reset" type="submit">Reset password</button>
+      </div>
+    </form>
+    <p class="alt"><a href="/login">Back to sign in</a></p>
+
+    {% else %}
     <form id="form" novalidate>
       {% if mode == 'register' %}
       <label for="name">Full name</label>
@@ -85,9 +126,25 @@
         <input id="password" name="password" type="password" autocomplete="{% if mode == 'login' %}current-password{% else %}new-password{% endif %}" required minlength="6">
         <button type="button" id="toggle" aria-label="Show password">Show</button>
       </div>
+      {% if mode == 'login' %}
+      <p class="forgot"><a id="forgotLink" href="/forgot">Forgot password?</a></p>
+      {% endif %}
       {% if mode == 'register' %}
       <label for="confirm">Confirm password</label>
       <input id="confirm" name="confirm" type="password" autocomplete="new-password" required minlength="6">
+
+      <label for="question">Security question</label>
+      <input id="question" name="question" type="text" list="qlist" maxlength="150" autocomplete="off" placeholder="Pick one or write your own" required>
+      <datalist id="qlist">
+        <option value="What was the name of your first pet?">
+        <option value="What was the name of your first school?">
+        <option value="In which city were you born?">
+        <option value="What is your favourite teacher's name?">
+        <option value="What is your mother's maiden name?">
+      </datalist>
+      <label for="answer">Answer to your question</label>
+      <input id="answer" name="answer" type="text" autocomplete="off" maxlength="100" required>
+      <p class="hint">You will need this answer if you forget your password. Choose something only you know.</p>
       {% endif %}
       <div id="err" class="err" role="alert"></div>
       <button class="submit" id="submit" type="submit">{% if mode == 'login' %}Sign in{% else %}Create account{% endif %}</button>
@@ -97,6 +154,7 @@
       {% if mode == 'login' %}New here? <a id="alt" href="/register">Create an account</a>
       {% else %}Already have an account? <a id="alt" href="/login">Sign in</a>{% endif %}
     </p>
+    {% endif %}
   </main>
 
   <script>
@@ -105,16 +163,90 @@
     var qs = new URLSearchParams(location.search);
     var next = qs.get("next") || "/";
     if (next.charAt(0) !== "/" || next.charAt(1) === "/") next = "/";   // same-site paths only
+    var okBox = document.getElementById("ok");
+    var form = document.getElementById("form");
+
+    function showOk(m) { okBox.textContent = m; okBox.classList.add("show"); }
+    function postJSON(url, body) {
+      return fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; });
+      });
+    }
+    function wireToggle(inputId) {
+      var t = document.getElementById("toggle"), inp = document.getElementById(inputId);
+      if (!t || !inp) return;
+      t.addEventListener("click", function () {
+        var show = inp.type === "password";
+        inp.type = show ? "text" : "password";
+        this.textContent = show ? "Hide" : "Show";
+      });
+    }
+
+    /* ---------------- forgot password ---------------- */
+    if (MODE === "forgot") {
+      var step1 = document.getElementById("step1"), step2 = document.getElementById("step2"),
+          err1 = document.getElementById("err1"), err2 = document.getElementById("err2"),
+          nextBtn = document.getElementById("next"), resetBtn = document.getElementById("reset"),
+          emailIn = document.getElementById("email"), qBox = document.getElementById("question"),
+          ans = document.getElementById("answer"), pw1 = document.getElementById("newpw"),
+          pw2 = document.getElementById("newpw2");
+      wireToggle("newpw");
+      function showErr(box, m) { box.textContent = m; box.classList.add("show"); }
+
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        if (!step2.hidden) return doReset();
+        return doStep1();
+      });
+
+      function doStep1() {
+        err1.classList.remove("show");
+        var email = emailIn.value.trim();
+        if (!email) return showErr(err1, "Please enter your email.");
+        nextBtn.disabled = true;
+        var label = nextBtn.textContent; nextBtn.textContent = "Checking…";
+        postJSON("/api/auth/forgot-question", { email: email }).then(function (res) {
+          if (!res.ok) return showErr(err1, res.d.error || "Something went wrong. Please try again.");
+          qBox.textContent = res.d.question;
+          step1.hidden = true; step2.hidden = false;
+          emailIn.readOnly = true;
+          ans.focus();
+        }).catch(function () {
+          showErr(err1, "Cannot reach the server. Please try again.");
+        }).then(function () { nextBtn.disabled = false; nextBtn.textContent = label; });
+      }
+
+      function doReset() {
+        err2.classList.remove("show");
+        if (!ans.value.trim()) return showErr(err2, "Please enter your answer.");
+        if (pw1.value.length < 6) return showErr(err2, "New password must be at least 6 characters.");
+        if (pw1.value !== pw2.value) return showErr(err2, "The two passwords do not match.");
+        resetBtn.disabled = true;
+        var label = resetBtn.textContent; resetBtn.textContent = "Resetting…";
+        postJSON("/api/auth/reset", {
+          email: emailIn.value.trim(), answer: ans.value, new_password: pw1.value
+        }).then(function (res) {
+          if (res.ok) { location.href = "/login?reset=1"; return; }
+          showErr(err2, res.d.error || "Something went wrong. Please try again.");
+        }).catch(function () {
+          showErr(err2, "Cannot reach the server. Please try again.");
+        }).then(function () { resetBtn.disabled = false; resetBtn.textContent = label; });
+      }
+      return;
+    }
+
+    /* ---------------- sign in / register ---------------- */
     var alt = document.getElementById("alt");
     if (next !== "/") alt.href += "?next=" + encodeURIComponent(next);
+    if (MODE === "login" && qs.get("reset")) showOk("Your password was changed. Please sign in with the new password.");
 
-    var form = document.getElementById("form"), err = document.getElementById("err"),
-        btn = document.getElementById("submit"), pw = document.getElementById("password");
-    document.getElementById("toggle").addEventListener("click", function () {
-      var show = pw.type === "password";
-      pw.type = show ? "text" : "password";
-      this.textContent = show ? "Hide" : "Show";
-    });
+    var err = document.getElementById("err"), btn = document.getElementById("submit"),
+        pw = document.getElementById("password");
+    wireToggle("password");
     function showError(m) { err.textContent = m; err.classList.add("show"); }
 
     form.addEventListener("submit", function (ev) {
@@ -126,22 +258,20 @@
       };
       if (MODE === "register") {
         body.name = form.name.value.trim();
+        body.security_question = form.question.value.trim();
+        body.security_answer = form.answer.value;
         if (body.name.length < 2) return showError("Please enter your name.");
         if (pw.value.length < 6) return showError("Password must be at least 6 characters.");
         if (pw.value !== form.confirm.value) return showError("The two passwords do not match.");
+        if (body.security_question.length < 5) return showError("Please choose or write a security question.");
+        if (body.security_answer.trim().length < 2) return showError("Please enter the answer to your security question.");
       }
       if (!body.email || !pw.value) return showError("Please enter your email and password.");
 
       btn.disabled = true;
       var label = btn.textContent;
       btn.textContent = MODE === "login" ? "Signing in…" : "Creating account…";
-      fetch("/api/auth/" + MODE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      }).then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; });
-      }).then(function (res) {
+      postJSON("/api/auth/" + MODE, body).then(function (res) {
         if (res.ok) { location.href = next; return; }
         showError(res.d.error || "Something went wrong. Please try again.");
       }).catch(function () {
