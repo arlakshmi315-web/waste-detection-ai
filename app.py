@@ -333,9 +333,17 @@ def init_db():
                 name TEXT NOT NULL,
                 email TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                security_question TEXT,
+                security_answer_hash TEXT
             )
         """)
+        ucols = [r["name"] for r in conn.execute("PRAGMA table_info(users)")]
+        if "security_question" not in ucols:      # made before password reset
+            conn.execute("ALTER TABLE users ADD COLUMN security_question TEXT")
+        if "security_answer_hash" not in ucols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN security_answer_hash TEXT")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS detections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -450,6 +458,26 @@ def build_prediction_payload(category, confidence, scores, now):
 # --------------------------------------------------------------------------
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _failed_logins = {}
+
+# Suggested security questions (users may also write their own).
+DEFAULT_QUESTIONS = [
+    "What was the name of your first pet?",
+    "What was the name of your first school?",
+    "In which city were you born?",
+    "What is your favourite teacher's name?",
+    "What is your mother's maiden name?",
+]
+
+
+def normalize_answer(text):
+    """Ignore capital letters and extra spaces when checking an answer."""
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
+def fake_question(email):
+    """Question shown for an unknown email, so strangers cannot tell whether
+    an account exists."""
+    return DEFAULT_QUESTIONS[sum(ord(c) for c in email) % len(DEFAULT_QUESTIONS)]
 
 
 def current_user():
@@ -876,7 +904,7 @@ def api_analytics():
 
 
 # --------------------------------------------------------------------------
-# Sign up / sign in
+# Sign up / sign in / reset password
 # --------------------------------------------------------------------------
 @app.get("/login")
 def login_page():
@@ -892,28 +920,44 @@ def register_page():
     return render_template("auth.html", mode="register")
 
 
+@app.get("/forgot")
+def forgot_page():
+    if current_user():
+        return redirect("/")
+    return render_template("auth.html", mode="forgot",
+                           questions=DEFAULT_QUESTIONS)
+
+
 @app.post("/api/auth/register")
 def api_register():
     d = request.get_json(silent=True) or {}
     name = (d.get("name") or "").strip()[:80]
     email = (d.get("email") or "").strip().lower()[:120]
     password = d.get("password") or ""
+    question = re.sub(r"\s+", " ", (d.get("security_question") or "")).strip()[:150]
+    answer = normalize_answer(d.get("security_answer"))[:100]
     if len(name) < 2:
         return fail("Please enter your name.", 400)
     if not EMAIL_RE.match(email):
         return fail("Please enter a valid email address.", 400)
     if len(password) < 6:
         return fail("Password must be at least 6 characters.", 400)
+    if len(question) < 5:
+        return fail("Please choose or write a security question.", 400)
+    if len(answer) < 2:
+        return fail("Please enter the answer to your security question.", 400)
     try:
         with db() as conn:
             first_user = conn.execute(
                 "SELECT COUNT(*) FROM users").fetchone()[0] == 0
             cur = conn.execute(
-                "INSERT INTO users (name, email, password_hash, created_at) "
-                "VALUES (?,?,?,?)",
+                "INSERT INTO users (name, email, password_hash, created_at, "
+                "security_question, security_answer_hash) VALUES (?,?,?,?,?,?)",
                 (name, email,
                  generate_password_hash(password, method="pbkdf2:sha256"),
-                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                 question,
+                 generate_password_hash(answer, method="pbkdf2:sha256")))
             uid = cur.lastrowid
             if first_user:   # detections saved before login existed
                 conn.execute("UPDATE detections SET user_id=? "
@@ -937,11 +981,64 @@ def api_login():
     with db() as conn:
         row = conn.execute("SELECT id, password_hash FROM users WHERE email=?",
                            (email,)).fetchone()
-    if row is None or not check_password_hash(row["password_hash"], password):
+    if row is None:
         _failed_logins.setdefault(key, []).append(time.time())
-        return fail("Incorrect email or password.", 401)
+        return fail("No account found with this email. "
+                    "Please create an account.", 401)
+    if not check_password_hash(row["password_hash"], password):
+        _failed_logins.setdefault(key, []).append(time.time())
+        return fail("Wrong password. Try again, or use \"Forgot password\".",
+                    401)
     _failed_logins.pop(key, None)
     _start_session(row["id"])
+    return jsonify({"success": True})
+
+
+@app.post("/api/auth/forgot-question")
+def api_forgot_question():
+    """Step 1 of a password reset: return the account's security question."""
+    d = request.get_json(silent=True) or {}
+    email = (d.get("email") or "").strip().lower()[:120]
+    if not EMAIL_RE.match(email):
+        return fail("Please enter a valid email address.", 400)
+    with db() as conn:
+        row = conn.execute(
+            "SELECT security_question, security_answer_hash FROM users "
+            "WHERE email=?", (email,)).fetchone()
+    if row and row["security_question"] and row["security_answer_hash"]:
+        return jsonify({"question": row["security_question"]})
+    # Unknown email (or an old account without a question): show a normal
+    # looking question so strangers cannot tell which emails have accounts.
+    return jsonify({"question": fake_question(email)})
+
+
+@app.post("/api/auth/reset")
+def api_reset():
+    """Step 2 of a password reset: check the answer and set a new password."""
+    d = request.get_json(silent=True) or {}
+    email = (d.get("email") or "").strip().lower()[:120]
+    answer = normalize_answer(d.get("answer"))[:100]
+    new_password = d.get("new_password") or ""
+    key = f"reset|{request.remote_addr}|{email}"
+    if _too_many_failures(key):
+        return fail("Too many attempts. Please wait 10 minutes and try "
+                    "again.", 429)
+    if len(new_password) < 6:
+        return fail("New password must be at least 6 characters.", 400)
+    with db() as conn:
+        row = conn.execute(
+            "SELECT id, security_answer_hash FROM users WHERE email=?",
+            (email,)).fetchone()
+        ok = bool(row and row["security_answer_hash"] and answer and
+                  check_password_hash(row["security_answer_hash"], answer))
+        if not ok:
+            _failed_logins.setdefault(key, []).append(time.time())
+            return fail("The email or the answer is not correct.", 400)
+        conn.execute(
+            "UPDATE users SET password_hash=? WHERE id=?",
+            (generate_password_hash(new_password, method="pbkdf2:sha256"),
+             row["id"]))
+    _failed_logins.pop(key, None)
     return jsonify({"success": True})
 
 
