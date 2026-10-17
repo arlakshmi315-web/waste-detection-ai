@@ -20,8 +20,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from flask import (Flask, g, jsonify, redirect, render_template, request,
-                   send_from_directory, session)
+from flask import (Flask, Response, g, jsonify, redirect, render_template,
+                   request, send_from_directory, session)
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -30,6 +30,14 @@ DB_DIR = BASE_DIR / "database"
 MODEL_PATH = BASE_DIR / "model" / "waste_classifier.keras"
 TFLITE_PATH = BASE_DIR / "model" / "waste_classifier.tflite"
 DB_PATH = DB_DIR / "waste_detection.db"
+
+# Permanent online database (Neon / any PostgreSQL). When DATABASE_URL is not
+# set, the app uses the local SQLite file instead (fine on your own laptop).
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+USE_PG = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 DB_DIR.mkdir(exist_ok=True)
@@ -312,24 +320,94 @@ def analyse_mixed(model, file_bytes, grid=GRID):
 
 
 # --------------------------------------------------------------------------
-# Database
+# Database (PostgreSQL online, SQLite on a laptop)
 # --------------------------------------------------------------------------
+INTEGRITY_ERRORS = (sqlite3.IntegrityError,)
+if USE_PG:
+    INTEGRITY_ERRORS += (psycopg2.IntegrityError,)
+
+ID_COL = "SERIAL PRIMARY KEY" if USE_PG else "INTEGER PRIMARY KEY AUTOINCREMENT"
+REAL_COL = "DOUBLE PRECISION" if USE_PG else "REAL"
+BLOB_COL = "BYTEA" if USE_PG else "BLOB"
+
+# Columns sent to the browser (the photo itself is served from /uploads/...).
+DET_COLS = ("id, image_name, image_path, waste_type, confidence, "
+            "category_group, latitude, longitude, location, "
+            "location_timestamp, date, time, timestamp, source, user_id")
+
+
+def blob(data):
+    return psycopg2.Binary(data) if USE_PG else data
+
+
+class _Conn:
+    """Same calls for SQLite and PostgreSQL (use ? for values)."""
+
+    def __init__(self, raw):
+        self.raw = raw
+        self.pg = USE_PG
+
+    def execute(self, sql, params=()):
+        if self.pg:
+            cur = self.raw.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur.execute(sql.replace("?", "%s"), params)
+            return cur
+        return self.raw.execute(sql, params)
+
+    def insert(self, sql, params=()):
+        """INSERT a row and return its new id."""
+        if self.pg:
+            cur = self.execute(sql + " RETURNING id", params)
+            return cur.fetchone()["id"]
+        return self.raw.execute(sql, params).lastrowid
+
+
+def _connect():
+    if USE_PG:
+        last = None
+        for _ in range(2):      # a sleeping free database may need a retry
+            try:
+                return _Conn(psycopg2.connect(DATABASE_URL, connect_timeout=15))
+            except psycopg2.OperationalError as exc:
+                last = exc
+                time.sleep(1.5)
+        raise last
+    raw = sqlite3.connect(DB_PATH, timeout=10)
+    raw.row_factory = sqlite3.Row
+    return _Conn(raw)
+
+
 @contextmanager
 def db():
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     try:
         yield conn
-        conn.commit()
+        conn.raw.commit()
+    except Exception:
+        try:
+            conn.raw.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        raise
     finally:
-        conn.close()
+        conn.raw.close()
+
+
+def ensure_column(conn, table, column, decl):
+    if conn.pg:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                     f"{column} {decl}")
+    else:
+        cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
+        if column not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 
 def init_db():
     with db() as conn:
-        conn.execute("""
+        conn.execute(f"""
             CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {ID_COL},
                 name TEXT NOT NULL,
                 email TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
@@ -338,35 +416,34 @@ def init_db():
                 security_answer_hash TEXT
             )
         """)
-        ucols = [r["name"] for r in conn.execute("PRAGMA table_info(users)")]
-        if "security_question" not in ucols:      # made before password reset
-            conn.execute("ALTER TABLE users ADD COLUMN security_question TEXT")
-        if "security_answer_hash" not in ucols:
-            conn.execute(
-                "ALTER TABLE users ADD COLUMN security_answer_hash TEXT")
-        conn.execute("""
+        ensure_column(conn, "users", "security_question", "TEXT")
+        ensure_column(conn, "users", "security_answer_hash", "TEXT")
+        conn.execute(f"""
             CREATE TABLE IF NOT EXISTS detections (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {ID_COL},
                 image_name TEXT NOT NULL,
                 image_path TEXT NOT NULL,
                 waste_type TEXT NOT NULL,
-                confidence REAL NOT NULL,
+                confidence {REAL_COL} NOT NULL,
                 category_group TEXT NOT NULL,
-                latitude REAL,
-                longitude REAL,
+                latitude {REAL_COL},
+                longitude {REAL_COL},
                 location TEXT,
                 location_timestamp TEXT,
                 date TEXT NOT NULL,
                 time TEXT NOT NULL,
                 timestamp TEXT NOT NULL,
                 source TEXT NOT NULL DEFAULT 'upload',
-                user_id INTEGER
+                user_id INTEGER,
+                image_data {BLOB_COL}
             )
         """)
-        cols = [r["name"] for r in conn.execute("PRAGMA table_info(detections)")]
-        if "user_id" not in cols:          # database made before login existed
-            conn.execute("ALTER TABLE detections ADD COLUMN user_id INTEGER")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_det_user ON detections(user_id)")
+        ensure_column(conn, "detections", "user_id", "INTEGER")
+        ensure_column(conn, "detections", "image_data", BLOB_COL)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_det_user "
+                     "ON detections(user_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_det_path "
+                     "ON detections(image_path)")
 
 
 def row_to_dict(row):
@@ -432,6 +509,27 @@ def parse_location(form):
     name = (form.get("location") or "").strip()[:200] or None
     loc_ts = (form.get("location_timestamp") or "").strip()[:40] or None
     return lat, lng, name, loc_ts
+
+
+THUMB_MAX = 720    # longest side of the photo copy kept in the database
+
+
+def make_thumb(file_bytes):
+    """Small JPEG copy of the photo, saved in the database (about 50-100 KB)."""
+    array = np.frombuffer(file_bytes, dtype=np.uint8)
+    image = cv2.imdecode(array, cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("The file is not a valid image.")
+    h, w = image.shape[:2]
+    scale = THUMB_MAX / max(h, w)
+    if scale < 1:
+        image = cv2.resize(image, (max(1, round(w * scale)),
+                                   max(1, round(h * scale))),
+                           interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 82])
+    if not ok:
+        raise ValueError("The image could not be compressed.")
+    return buf.tobytes()
 
 
 def build_prediction_payload(category, confidence, scores, now):
@@ -572,11 +670,18 @@ def settings_page():
 def uploaded_file(filename):
     with db() as conn:
         row = conn.execute(
-            "SELECT 1 FROM detections WHERE image_path=? AND user_id=?",
+            "SELECT image_data FROM detections "
+            "WHERE image_path=? AND user_id=?",
             (filename, g.user["id"])).fetchone()
     if row is None:
         return fail("Not found.", 404)
-    return send_from_directory(UPLOAD_DIR, filename)
+    if row["image_data"]:
+        resp = Response(bytes(row["image_data"]), mimetype="image/jpeg")
+        resp.headers["Cache-Control"] = "private, max-age=86400"
+        return resp
+    if (UPLOAD_DIR / filename).is_file():     # older photos saved on disk
+        return send_from_directory(UPLOAD_DIR, filename)
+    return fail("Not found.", 404)
 
 
 # --------------------------------------------------------------------------
@@ -589,6 +694,7 @@ def api_status():
         "model_file": MODEL_PATH.name,
         "model_error": MODEL_ERROR,
         "classes": CLASS_NAMES,
+        "database": "postgresql" if USE_PG else "sqlite",
     })
 
 
@@ -627,22 +733,21 @@ def _predict(save):
 
     lat, lng, loc_name, loc_ts = parse_location(request.form)
     source = "camera" if request.form.get("source") == "camera" else "upload"
-    stored = f"{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
+    stored = f"{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.jpg"
     try:
-        (UPLOAD_DIR / stored).write_bytes(data)
+        thumb = make_thumb(data)
         with db() as conn:
-            cur = conn.execute(
+            payload["id"] = conn.insert(
                 """INSERT INTO detections
                    (image_name, image_path, waste_type, confidence,
                     category_group, latitude, longitude, location,
                     location_timestamp, date, time, timestamp, source,
-                    user_id)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    user_id, image_data)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (name, stored, category, confidence,
                  CATEGORY_INFO[category]["group"], lat, lng, loc_name,
                  loc_ts, payload["date"], payload["time"],
-                 payload["timestamp"], source, g.user["id"]))
-            payload["id"] = cur.lastrowid
+                 payload["timestamp"], source, g.user["id"], blob(thumb)))
     except Exception:  # noqa: BLE001
         log.exception("Could not save detection")
         return fail("The prediction worked but could not be saved to "
@@ -718,22 +823,21 @@ def api_predict_mixed():
                     "recommendation": info["tip"]})
 
     lat, lng, loc_name, loc_ts = parse_location(request.form)
-    stored = f"{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
+    stored = f"{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.jpg"
     try:
-        (UPLOAD_DIR / stored).write_bytes(data)
+        thumb = make_thumb(data)
         with db() as conn:
-            cur = conn.execute(
+            payload["id"] = conn.insert(
                 """INSERT INTO detections
                    (image_name, image_path, waste_type, confidence,
                     category_group, latitude, longitude, location,
                     location_timestamp, date, time, timestamp, source,
-                    user_id)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    user_id, image_data)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (f"{name} (mixed)", stored, dominant, top["avg_confidence"],
                  info["group"], lat, lng, loc_name, loc_ts,
                  payload["date"], payload["time"], payload["timestamp"],
-                 "upload", g.user["id"]))
-            payload["id"] = cur.lastrowid
+                 "upload", g.user["id"], blob(thumb)))
     except Exception:  # noqa: BLE001
         log.exception("Could not save mixed detection")
         return fail("The analysis worked but could not be saved to "
@@ -759,7 +863,7 @@ def api_history():
     except ValueError:
         limit = 1000
 
-    sql = "SELECT * FROM detections"
+    sql = f"SELECT {DET_COLS} FROM detections"
     where, params = ["user_id = ?"], [g.user["id"]]
     if wtype in CLASS_NAMES:
         where.append("waste_type = ?")
@@ -949,8 +1053,8 @@ def api_register():
     try:
         with db() as conn:
             first_user = conn.execute(
-                "SELECT COUNT(*) FROM users").fetchone()[0] == 0
-            cur = conn.execute(
+                "SELECT COUNT(*) AS n FROM users").fetchone()["n"] == 0
+            uid = conn.insert(
                 "INSERT INTO users (name, email, password_hash, created_at, "
                 "security_question, security_answer_hash) VALUES (?,?,?,?,?,?)",
                 (name, email,
@@ -958,11 +1062,10 @@ def api_register():
                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                  question,
                  generate_password_hash(answer, method="pbkdf2:sha256")))
-            uid = cur.lastrowid
             if first_user:   # detections saved before login existed
                 conn.execute("UPDATE detections SET user_id=? "
                              "WHERE user_id IS NULL", (uid,))
-    except sqlite3.IntegrityError:
+    except INTEGRITY_ERRORS:
         return fail("An account with this email already exists. "
                     "Please sign in.", 409)
     _start_session(uid)
@@ -1076,6 +1179,8 @@ def server_error(_):
 
 
 init_db()
+log.info("Database: %s", "PostgreSQL (permanent)" if USE_PG
+         else "SQLite file (data is lost when a free host restarts)")
 
 if __name__ == "__main__":
     threading.Thread(target=get_model, daemon=True).start()  # warm up
