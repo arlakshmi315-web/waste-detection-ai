@@ -422,3 +422,11 @@ code { background: rgba(15, 155, 113, 0.08); padding: 2px 6px; border-radius: 6p
   .preview-meta .btn { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---- Mobile fix: show the full location address (keep this block LAST) ---- */
+@media (max-width: 900px) {
+  .topbar { flex-wrap: wrap; row-gap: 10px; }
+  .page-title { flex: 1 1 0; min-width: 0; }
+  #locChip { order: 10; flex: 1 1 100%; max-width: 100%; justify-content: flex-start; border-radius: 14px; padding: 9px 14px; }
+  #locChip span, #locChipText { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.35; text-align: left; font-size: 13px; }
+}
